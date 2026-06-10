@@ -73,14 +73,14 @@ export default function Home() {
       for (const c of COUNTRIES) {
         for (const s of SECTORS) {
           try {
-            const data = await discoverOne(c, s);
+            const data = await discoverOne(c, s.value);
             if (data.error) {
-              addLog(`Discovery error (${c}/${s}): ${data.error}`);
+              addLog(`Discovery error (${c}/${s.value}): ${data.error}`);
             } else {
-              addLog(`Discovered ${c} / ${s}: +${data.inserted} new (found ${data.candidatesFound})`);
+              addLog(`Discovered ${c} / ${s.value}: +${data.inserted} new (found ${data.candidatesFound})`);
             }
           } catch (err: any) {
-            addLog(`Discovery error (${c}/${s}): ${err.message}`);
+            addLog(`Discovery error (${c}/${s.value}): ${err.message}`);
           }
           await refresh();
         }
