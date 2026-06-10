@@ -28,6 +28,7 @@ export default function Home() {
   const [log, setLog] = useState<string[]>([]);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [enrichLoading, setEnrichLoading] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   function addLog(msg: string) {
     setLog((l) => [`${new Date().toLocaleTimeString()}  ${msg}`, ...l].slice(0, 50));
@@ -45,6 +46,72 @@ export default function Home() {
   useEffect(() => {
     refresh();
   }, []);
+
+  async function discoverOne(c: string, s: string, q?: string) {
+    const res = await fetch("/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ country: c, sector: s, query: q }),
+    });
+    return res.json();
+  }
+
+  async function enrichOne() {
+    const res = await fetch("/api/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batchSize: 5 }),
+    });
+    return res.json();
+  }
+
+  // Runs discovery for every country x sector combo, then enriches everything found.
+  async function runFullPipeline() {
+    setBulkRunning(true);
+    try {
+      addLog(`Starting full run: ${COUNTRIES.length} countries x ${SECTORS.length} sectors`);
+      for (const c of COUNTRIES) {
+        for (const s of SECTORS) {
+          try {
+            const data = await discoverOne(c, s);
+            if (data.error) {
+              addLog(`Discovery error (${c}/${s}): ${data.error}`);
+            } else {
+              addLog(`Discovered ${c} / ${s}: +${data.inserted} new (found ${data.candidatesFound})`);
+            }
+          } catch (err: any) {
+            addLog(`Discovery error (${c}/${s}): ${err.message}`);
+          }
+          await refresh();
+        }
+      }
+
+      addLog("Discovery done for all countries. Starting enrichment...");
+
+      // Keep enriching until nothing left
+      // Safety cap to avoid infinite loops if something goes wrong
+      for (let i = 0; i < 200; i++) {
+        const data = await enrichOne();
+        if (data.error) {
+          addLog(`Enrichment error: ${data.error}`);
+          break;
+        }
+        if (data.processed === 0) {
+          addLog("Enrichment complete — nothing left to enrich.");
+          break;
+        }
+        addLog(
+          `Enriched batch: ` + data.results.map((r: any) => `${r.name} → ${r.status}`).join(", ")
+        );
+        await refresh();
+      }
+
+      addLog("Full run finished.");
+    } finally {
+      setBulkRunning(false);
+      await refresh();
+    }
+  }
 
   async function runDiscovery() {
     setDiscoverLoading(true);
@@ -113,7 +180,21 @@ export default function Home() {
       </div>
 
       <div className="panel">
-        <h2>1 · Discover companies</h2>
+        <h2>One-click run (all countries × sectors)</h2>
+        <div className="row">
+          <button onClick={runFullPipeline} disabled={bulkRunning || discoverLoading || enrichLoading}>
+            {bulkRunning ? "Running… (keep this tab open)" : "Run full pipeline"}
+          </button>
+          <span style={{ color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12 }}>
+            Discovers companies for every country/sector combo, then enriches everything found.
+            This can take a long time (10-30+ min) — keep the tab open while it runs.
+          </span>
+        </div>
+        {log.length > 0 && <div className="log">{log.join("\n")}</div>}
+      </div>
+
+      <div className="panel">
+        <h2>1 · Discover companies (single run)</h2>
         <div className="row">
           <select value={country} onChange={(e) => setCountry(e.target.value)}>
             {COUNTRIES.map((c) => (
@@ -131,7 +212,7 @@ export default function Home() {
             value={customQuery}
             onChange={(e) => setCustomQuery(e.target.value)}
           />
-          <button onClick={runDiscovery} disabled={discoverLoading}>
+          <button onClick={runDiscovery} disabled={discoverLoading || bulkRunning}>
             {discoverLoading ? "Searching…" : "Run discovery"}
           </button>
         </div>
@@ -140,7 +221,7 @@ export default function Home() {
       <div className="panel">
         <h2>2 · Enrich (director, email, phone, site)</h2>
         <div className="row">
-          <button onClick={runEnrichBatch} disabled={enrichLoading}>
+          <button onClick={runEnrichBatch} disabled={enrichLoading || bulkRunning}>
             {enrichLoading ? "Enriching…" : "Enrich next 5"}
           </button>
           <button className="secondary" onClick={refresh}>Refresh table</button>
