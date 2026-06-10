@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { tavilySearch } from "@/lib/tavily";
-import { askClaudeJSON } from "@/lib/claude";
-import { getSupabase } from "@/lib/supabase";
+import { tavilySearch } from "../../../lib/tavily";
+import { askClaudeJSON } from "../../../lib/claude";
+import { getSupabase } from "../../../lib/supabase";
 
 export const maxDuration = 60;
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase } from "../../../lib/supabase";
 
 function csvEscape(value: any) {
   if (value === null || value === undefined) return "";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase } from "../../../lib/supabase";
 
 export async function GET(req: NextRequest) {
   try {
